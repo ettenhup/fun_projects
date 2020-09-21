@@ -53,7 +53,7 @@ def solveLinSys(r_vecs, dim):
 def fitWithCR(x_sample, y_sample, d, conv_thresh = 0.007, max_iter = 1000000, subspace = None):
    N = len(x_sample)
    X = np.array([[x_sample[sample]**degree for degree in range(d)] for sample in range(N)])
-   c_cr = np.array([0.0 for _ in range(d)])
+   c_cr = np.array([1000.0 for _ in range(d)])
    subspace = max_iter if subspace == None else subspace
    it = 0
    reset_iter = 0
@@ -64,7 +64,6 @@ def fitWithCR(x_sample, y_sample, d, conv_thresh = 0.007, max_iter = 1000000, su
       c_bef = c_cr
       res = np.dot(X.transpose(), np.dot(X, c_cr) - y_sample)
       res_norm = sum(r**2 for r in res)**0.5
-      print(res_norm)
       if res_norm < conv_thresh or abs(last_res_norm - res_norm) < conv_thresh:
          break
       last_res_norm = res_norm
