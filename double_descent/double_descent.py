@@ -46,7 +46,8 @@ for dd in domain:
     r_sgdtrain.append((getResidual(x_train, y_train, c_sgd, dd))**2)
     n_sgdl.append(n_sgd)
     
-    n_cr, c_cr = fitWithCR(x_train, y_train, dd, conv_thresh=thr, subspace=10)
+    X = np.array([[x_train[sample]**degree for degree in range(dd)] for sample in range(N)])
+    n_cr, c_cr = fitWithCR(guess=np.array([0.0 for _ in range(dd)]), residual=lambda c_cr : np.dot(X.transpose(), np.dot(X, c_cr) - y_train), conv_thresh=thr, subspace=10)
     r_cr.append((getResidual(x_test, y_test, c_cr, dd))**2)
     r_crtrain.append((getResidual(x_train, y_train, c_cr, dd))**2)
     n_crl.append(n_cr)

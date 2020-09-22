@@ -50,10 +50,11 @@ def solveLinSys(r_vecs, dim):
    return np.linalg.solve(B, c)
 
 #Fit with CR
-def fitWithCR(x_sample, y_sample, d, conv_thresh = 0.007, max_iter = 1000000, subspace = None):
-   N = len(x_sample)
-   X = np.array([[x_sample[sample]**degree for degree in range(d)] for sample in range(N)])
-   c_cr = np.array([1000.0 for _ in range(d)])
+def fitWithCR(guess = None, residual = None, conv_thresh = 0.007, max_iter = 1000000, subspace = None):
+   if residual==None:
+       print("The residual callback needs to be defined")
+       exit(1)
+   c_cr = guess
    subspace = max_iter if subspace == None else subspace
    it = 0
    reset_iter = 0
@@ -62,7 +63,7 @@ def fitWithCR(x_sample, y_sample, d, conv_thresh = 0.007, max_iter = 1000000, su
    last_res_norm = float("inf")
    while it < max_iter:
       c_bef = c_cr
-      res = np.dot(X.transpose(), np.dot(X, c_cr) - y_sample)
+      res = residual(c_cr)
       res_norm = sum(r**2 for r in res)**0.5
       if res_norm < conv_thresh or abs(last_res_norm - res_norm) < conv_thresh:
          break
