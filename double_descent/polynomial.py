@@ -26,6 +26,23 @@ def fitWithSVD(x_sample, y_sample, d):
    c_svd = np.dot(np.dot(vh.transpose(), np.dot(s_inv, u.transpose())), y_sample)
    return c_svd
 
+def fitExpLinkWithSGD(x_sample, y_sample,d , conv_thresh = 0.007, gamma = 0.05, max_iter = 1000000):
+   c_sgd = np.array([0.0 for _ in range(d)])
+   N = len(x_sample)
+   X = np.array([[x_sample[sample]**degree for degree in range(d)] for sample in range(N)])
+   it = 0
+   last_res_norm = float("inf")
+   while it < max_iter :
+      c_bef = c_sgd
+      res = y_sample - np.dot(X, c_sgd) # negative gradient
+      res_norm = sum(r**2 for r in res)**0.5
+      if res_norm < conv_thresh or abs(last_res_norm - res_norm) < conv_thresh:
+         break
+      last_res_norm = res_norm
+      c_sgd = c_sgd + gamma * np.dot(X.transpose(), res)
+      it += 1
+   return it, c_sgd
+   
 #Fit with SGD
 def fitWithSGD(x_sample, y_sample,d , conv_thresh = 0.007, gamma = 0.05, max_iter = 1000000):
    c_sgd = np.array([0.0 for _ in range(d)])
