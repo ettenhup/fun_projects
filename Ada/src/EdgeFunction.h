@@ -1,7 +1,5 @@
 #include <cstdint>
-#include <initializer_list>
 #include <cstdarg>
-#include <vector>
 #include <random>
 #include <iostream>
 #include "DifferentiableFunction.h"
@@ -11,7 +9,148 @@ std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis(-1.0,1.0);
 
 template<typename T>
-class LinearCompositeFunction: public DifferentiableFunction<T> {
+class CombinationOfElementalFunctions: public virtual DifferentiableFunction<T> {
+public:
+	virtual std::vector<DifferentiableFunction<T>*>* const get_sub_functions() = 0;
+
+	virtual uint32_t const get_number_parameters(){
+		std::vector<DifferentiableFunction<T>*>* fs = get_sub_functions();
+		return std::accumulate(fs->begin(), fs->end(), 0, [](uint32_t acc, DifferentiableFunction<T>* f){
+				return acc + f->get_number_parameters();
+			});
+	}
+	virtual std::vector<T*> const get_parameters(){
+		std::vector<T*> allParam;
+		std::vector<DifferentiableFunction<T>*>* fs = get_sub_functions();
+		for(DifferentiableFunction<T>* f : *fs){
+			std::vector<T*> thisFunParam = f->get_parameters();
+			allParam.insert(allParam.end(), thisFunParam.begin(), thisFunParam.end());
+		}
+		return allParam;
+	}
+	virtual bool const depends_directly_on(T* p) {
+		std::vector<DifferentiableFunction<T>*>* fs = get_sub_functions();
+		return std::any_of(fs->begin(), fs->end(), [&p](DifferentiableFunction<T>* f){return f->depends_directly_on(p);});
+	}
+	virtual void align_parameters(T* p){
+		std::vector<DifferentiableFunction<T>*>* fs = get_sub_functions();
+		uint32_t offset = 0;
+		for(DifferentiableFunction<T>* f : *fs){
+			uint32_t nparams = f->get_number_parameters();
+			f->align_parameters(p+offset);
+			offset += nparams;
+		}
+	}
+	virtual void align_parameters(std::vector<T*> p){
+		assert(p.size() == get_number_parameters());
+		std::vector<DifferentiableFunction<T>*>* fs = get_sub_functions();
+		uint32_t offset = 0;
+		for(DifferentiableFunction<T>* f : *fs){
+			uint32_t nparams = f->get_number_parameters();
+			f->align_parameters(std::vector<T*>(p.begin()+offset, p.begin()+offset+nparams));
+			offset += nparams;
+		}
+	}
+};
+
+template<typename T>
+class Sum: public virtual CombinationOfElementalFunctions<T> {
+	std::vector<DifferentiableFunction<T>*> functions;
+public:
+	Sum(std::initializer_list<DifferentiableFunction<T>*> funs){
+		functions.assign(funs.begin(), funs.end());
+	}
+	Sum(std::vector<DifferentiableFunction<T>*> funs){
+		functions.assign(funs.begin(), funs.end());
+	}
+	virtual std::vector<DifferentiableFunction<T>*>* const get_sub_functions() {
+		return &functions;
+	}
+	virtual T const evaluate(T x){
+		T res = 0.0;
+		for(DifferentiableFunction<T>* f : functions){
+			res += f->evaluate(x);
+		}
+		return res;
+	}
+	virtual T const derivative(const T x){
+		T res = 0.0;
+		for(DifferentiableFunction<T>* f : functions){
+			res += f->derivative(x);
+		}
+		return res;
+	}
+	virtual T const derivative(const T x, T* p){
+		if(!this->depends_directly_on(p)){ 
+			return 0.0;
+		}
+		T res = 1.0;
+		for(DifferentiableFunction<T>* f : functions){
+			res += f->derivative(x, p);
+		}
+		return res;
+	}
+};
+
+template<typename T>
+class Product: public virtual CombinationOfElementalFunctions<T> {
+	std::vector<DifferentiableFunction<T>*> functions;
+public:
+	Product(std::initializer_list<DifferentiableFunction<T>*> funs){
+		functions.assign(funs.begin(), funs.end());
+	}
+	Product(std::vector<DifferentiableFunction<T>*> funs){
+		functions.assign(funs.begin(), funs.end());
+	}
+	virtual std::vector<DifferentiableFunction<T>*>* const get_sub_functions() {
+		return &functions;
+	}
+	virtual T const evaluate(T x){
+		T res = 1.0;
+		for(DifferentiableFunction<T>* f : functions){
+			res *= f->evaluate(x);
+		}
+		return res;
+	}
+	virtual T const derivative(const T x){
+		T res = 0.0;
+		for(uint32_t ifun=0; ifun<functions.size(); ifun ++){
+			T part = 1.0;
+			for(uint32_t jfun=0; jfun<functions.size(); jfun++){
+				if(ifun == jfun){
+					part *= functions[jfun]->derivative(x);
+				}
+				else{
+					part *= functions[jfun]->evaluate(x);
+				}
+			}
+			res += part;
+		}
+		return res;
+	}
+	virtual T const derivative(const T x, T* p){
+		if(!this->depends_directly_on(p)){ 
+			return 0.0;
+		}
+		T res = 0.0;
+		for(uint32_t ifun=0; ifun<functions.size(); ifun ++){
+			T part = 1.0;
+			for(uint32_t jfun=0; jfun<functions.size(); jfun++){
+				if(ifun == jfun){
+					part *= functions[jfun]->derivative(x, p);
+				}
+				else{
+					part *= functions[jfun]->evaluate(x);
+				}
+			}
+			res += part;
+		}
+		return res;
+	}
+};
+
+template<typename T>
+class CompositeFunction: public virtual CombinationOfElementalFunctions<T> {
 	std::vector<DifferentiableFunction<T>*> functions;
 	std::vector<T> get_sub_evaluations(const T x){
 		std::vector<T> evals(functions.size());
@@ -25,36 +164,17 @@ class LinearCompositeFunction: public DifferentiableFunction<T> {
 		return evals;
 	}
 public:
-	LinearCompositeFunction(std::vector<DifferentiableFunction<T>*> funs){
+	CompositeFunction(std::vector<DifferentiableFunction<T>*> funs){
 		functions.assign(funs.begin(), funs.end());
 	}
-	virtual uint32_t const get_number_parameters(){
-		return std::accumulate(functions.begin(), functions.end(), 0, [](uint32_t acc, DifferentiableFunction<T>* f){
-				return acc + f->get_number_parameters();
-			});
-	}
-	virtual void const get_parameters(T** p){
-		uint32_t totParam = 0;
-		for(DifferentiableFunction<T>* f : functions){
-			uint32_t nparam = f->get_number_parameters();
-			if(nparam>0){
-				T** funParams = new T*[nparam];
-				f->get_parameters(funParams);
-				for(uint32_t iparam = 0; iparam < nparam; iparam++){
-					p[totParam++] = funParams[iparam];
-				}
-				delete [] funParams;
-			}
-		}
+	virtual std::vector<DifferentiableFunction<T>*>* const get_sub_functions() {
+		return &functions;
 	}
 	virtual T const evaluate(T x){
 		T res = x;
-		std::cout<<std::endl;
 		for(DifferentiableFunction<T>* f : functions){
-			std::cout << " (" << res  << ", " << f->evaluate(1) << ") ";
 			res = f->evaluate(res);
 		}
-		std::cout << " " << res << std::endl;
 		return res;
 	}
 	virtual T const derivative(const T x){
@@ -66,7 +186,7 @@ public:
 		return res;
 	}
 	virtual T const derivative(const T x, T* p){
-		if(!depends_directly_on(p)){ 
+		if(!this->depends_directly_on(p)){ 
 			return 0.0;
 		}
 		T res = 1.0;
@@ -80,50 +200,24 @@ public:
 		res *= functions[iFunction]->derivative(evals[iFunction],p);
 		return res;
 	}
-	virtual bool const depends_directly_on(T* p) {
-		return std::any_of(functions.begin(), functions.end(), [&p](DifferentiableFunction<T>* f){return f->depends_directly_on(p);});
-	}
 };
+
 template<typename T>
 class LinearFunctionComposer {
 	std::vector<DifferentiableFunction<T>*>* functions;
-	std::vector<T>* parameters;
-
-	T* reserve_parameters(std::initializer_list<T> args){
-		for (auto e : args) {
-			parameters->push_back(e);
-		}
-		return &(*(parameters->end() - args.size()));
-	}
-	T* reserve_parameters(uint32_t n){
-		for(uint32_t iparam = 0; iparam < n; iparam++){
-			parameters->push_back(dis(rd));
-		}
-		return &(*(parameters->end() - n));
-	}
-
 public:
 	LinearFunctionComposer(){
 		functions = new std::vector<DifferentiableFunction<T>*>();
-		parameters = new std::vector<T>();
 	}
-
 	template<class c> DifferentiableFunction<T>* apply_after(){
-		static_assert(c::is_elemental, "Expecting c to be derived from DifferentiableFunction");
-		T* p =  c::get_static_number_parameters == 0 ? nullptr : reserve_parameters(c::get_static_number_parameters);
-		functions->emplace_back(c::get_instance(p));
+		static_assert(c::is_elemental, "Expecting c to be derived from ElementalFunction");
+		functions->emplace_back(c::get_instance());
 		return functions->back();
 	}
-
-	template<class c> DifferentiableFunction<T>* apply_after(std::initializer_list<T> args){
-		static_assert(c::is_elemental, "Expecting c to be derived from DifferentiableFunction");
-		//assert(c::get_static_number_parameters() == args.size());
-		T* p = reserve_parameters(args);
-		functions->emplace_back(c::get_instance(p));
-		return functions->back();
+	void apply_after(DifferentiableFunction<T>* f){
+		functions->push_back(f);
 	}
-
-	std::pair<LinearCompositeFunction<T>, std::vector<T> > done(){
-		return std::make_pair(LinearCompositeFunction<T>(*functions), *parameters);
+	CompositeFunction<T> done(){
+		return CompositeFunction<T>(*functions);
 	}
 };
