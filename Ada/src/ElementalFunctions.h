@@ -8,9 +8,6 @@ template<typename T>
 class ElementalFunction {
 public:
 	enum EnumDiff { is_elemental = true };
-	static constexpr uint32_t get_static_number_parameters(){
-		return 0;
-	};
 	static DifferentiableFunction<T>* get_instance(){
 		return nullptr;
 	}
@@ -19,9 +16,6 @@ template<typename T>
 class ElementalDerivedFunction {
 public:
 	enum EnumDiff { is_elemental = true };
-	static constexpr uint32_t get_static_number_parameters(){
-		return 0;
-	};
 	static DifferentiableFunction<T>* get_instance(){
 		return nullptr;
 	}
@@ -29,11 +23,8 @@ public:
 template<typename T>
 class ReLu: public DifferentiableFunction<T>, public ElementalFunction<T> {
 public:
-	static constexpr uint32_t get_static_number_parameters(){
-		return 0;
-	}
 	virtual uint32_t const get_number_parameters(){
-		return get_static_number_parameters();
+		return 0;
 	}
 	static DifferentiableFunction<T>* get_instance(){
 		return new ReLu<T>();
@@ -61,11 +52,8 @@ public:
 template<typename T>
 class Exp: public DifferentiableFunction<T>, public ElementalFunction<T> {
 public:
-	static constexpr uint32_t get_static_number_parameters(){
-		return 0;
-	}
 	virtual uint32_t const get_number_parameters(){
-		return get_static_number_parameters();
+		return 0;
 	}
 	static DifferentiableFunction<T>* get_instance(){
 		return new Exp<T>();
@@ -98,11 +86,8 @@ public:
 	static DifferentiableFunction<T>* get_instance(){
 		return new Linear<T>();
 	}
-	static constexpr uint32_t get_static_number_parameters(){
-		return 2;
-	}
 	virtual uint32_t const get_number_parameters(){
-		return get_static_number_parameters();
+		return 2;
 	}
 	virtual std::vector<T*> const get_parameters(){
 		assert(a);
@@ -140,7 +125,7 @@ public:
 		this->align_external_to_internal_parameter(&b,p+1);
 	}
 	virtual void align_parameters(std::vector<T*> p){
-		assert(p.size()==get_static_number_parameters());
+		assert(p.size()==get_number_parameters());
 		this->align_external_to_internal_parameter(&a,*(p.begin()));
 		this->align_external_to_internal_parameter(&b,*(p.begin()+1));
 	}
@@ -154,11 +139,8 @@ public:
 	static DifferentiableFunction<T>* get_instance(){
 		return new GaussCurve<T>();
 	}
-	static constexpr uint32_t get_static_number_parameters(){
-		return 3;
-	}
 	virtual uint32_t const get_number_parameters(){
-		return get_static_number_parameters();
+		return 3;
 	}
 	virtual std::vector<T*> const get_parameters(){
 		assert(a);
@@ -207,7 +189,7 @@ public:
 		this->align_external_to_internal_parameter(&c,p+2);
 	}
 	virtual void align_parameters(std::vector<T*> p){
-		assert(p.size()==get_static_number_parameters());
+		assert(p.size()==get_number_parameters());
 		this->align_external_to_internal_parameter(&a,*(p.begin()));
 		this->align_external_to_internal_parameter(&b,*(p.begin()+1));
 		this->align_external_to_internal_parameter(&c,*(p.begin()+2));

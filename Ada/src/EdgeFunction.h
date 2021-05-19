@@ -209,6 +209,9 @@ public:
 	LinearFunctionComposer(){
 		functions = new std::vector<DifferentiableFunction<T>*>();
 	}
+	~LinearFunctionComposer(){
+		if(functions) delete functions;
+	}
 	template<class c> DifferentiableFunction<T>* apply_after(){
 		static_assert(c::is_elemental, "Expecting c to be derived from ElementalFunction");
 		functions->emplace_back(c::get_instance());
@@ -218,6 +221,8 @@ public:
 		functions->push_back(f);
 	}
 	CompositeFunction<T> done(){
-		return CompositeFunction<T>(*functions);
+		CompositeFunction<T> c = CompositeFunction<T>(*functions);
+		functions = nullptr;
+		return c;
 	}
 };

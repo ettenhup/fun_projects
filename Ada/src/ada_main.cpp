@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <random>
 #include <functional>
+#include <unordered_set>
 #include "assert.h"
 #include "DifferentiableFunction.h"
 #include "ElementalFunctions.h"
@@ -16,55 +17,102 @@
 //using Eigen::MatrixXd;
 // clang++ -I/usr/local/Cellar/eigen/3.3.8_1/include/eigen3 ada_main.cpp -o ada
 
+template<typename T>
+class FunctionGraph : public virtual CombinationOfElementalFunctions<T> {
+	std::vector<Node<T>*>* allNodes;
+	std::vector<Node<T>*>* inputs;
+	std::vector<Node<T>*>* outputs;
+	std::vector<DifferentiableFunction<T>*>* allFunct;
+public:
+	FunctionGraph(const std::unordered_set<Node<T>*>* allNodes){
+		this->allNodes = new std::vector<Node<T>*>();
+		this->inputs = new std::vector<Node<T>*>();
+		this->outputs = new std::vector<Node<T>*>();
+		this->allFunct = new std::vector<DifferentiableFunction<T>*>();
+		// TODO: Something smart with memory layout! Ordering of nodes should be 
+		// done according to most efficient graph traversal
+		for(Node<T>* node : *allNodes){
+			this->allNodes->emplace_back(node);
+			if(node->get_children.size()) this->outputs.emplace_back(node);
+			if(node->get_parents().size()) this->inputs.emplace_back(node);
 
-//template<typename T>
-//class FunctionComposer {
-//	std::vector<Node<T>*> allNodes;
-//	std::vector<DifferentiableFunction<T>*> allFunctions;
-//	std::vector<T> parameters;
-//
-//	T* reserve_parameters(std::initializer_list<T> args){
-//		for (auto e : args) {
-//			parameters.push_back(e);
-//		}
-//		return &(*(parameters.end() - args.size()));
-//	}
-//
-//public:
-//	FunctionComposer(){
-//	}
-//
-//	template<class c> Edge<T>* add_edge(Node<T>* from, Node<T>* to, std::initializer_list<T> args){
-//		static_assert(c::is_differentiable_function, "Expecting c to be derived from DifferentiableFunction");
-//		//static_assert(c::get_static_number_parameters() == args.size(), "Expecting c to be have the provided number of parameters");
-//		double* p = reserve_parameters(args);
-//		allFunctions.emplace_back(c::get_instance(p));
-//		from->add_child(to, allFunctions.back());
-//		to->add_parent(from, allFunctions.back());
-//		return &from->get_children()->back();
-//	}
-//
-//	template<class c> Node<T>* add_node(){
-//		static_assert(c::is_differentiable_function, "Expecting c to be derived from DifferentiableFunction");
-//		static_assert(c::get_static_number_parameters == 0, "Expecting c to be have zero parameters");
-//		allFunctions.emplace_back(c::get_instance(nullptr));
-//		allNodes.emplace_back(allFunctions.back());
-//		return &allNodes.back();
-//	}
-//
-//	template<class c> Node<T>* add_node(std::initializer_list<T> args){
-//		static_assert(c::is_differentiable_function, "Expecting c to be derived from DifferentiableFunction");
-//		//static_assert(c::get_static_number_parameters() == args.size(), "Expecting c to be have the provided number of parameters");
-//		double* p = reserve_parameters(args);
-//		allFunctions.emplace_back(c::get_instance(p));
-//		allNodes.emplace_back(allFunctions.back());
-//		return &allNodes.back();
-//	}
-//
-//	CompositeFunction<T> done(){
-//		return CompositeFunction<T>(allNodes, parameters);
-//	}
-//};
+			this->allFunct->emplace_back(node->get_activation());
+			for(Edge<T>* parent : node->get_parents()){
+				this->allFunct->emplace_back(parent->get_function());
+			}
+		}
+
+	}
+	~FunctionGraph(){
+		if(allNodes) delete allNodes;
+		if(inputs) delete inputs;
+		if(outputs) delete outputs;
+		if(allFunct) delete allFunct;
+	}
+	virtual std::vector<DifferentiableFunction<T>*>* const get_sub_functions() {
+		return allFunct;
+	}
+
+	std::vector<Node<T>*>* getInputs(){
+		return inputs;
+	}
+	std::vector<Node<T>*>* getOutputs(){
+		return outputs;
+	}
+
+	std::vector<T> apply(std::vector<T> x){
+		assert(x.size() == inputs->size());
+		//TODO: optimize
+		std::unordered_set<Node<T>*> nextLayer;
+		std::vector<T> thisLayerResults;
+		for(uint32_t iInp = 0; iInp < inputs->size(); iInp++){
+			thisLayerResults.emplace_back(inputs->at(iInp).activation()->evaluate(x[iInp]));
+			for(Node<T>* node : inputs->at(iInp).get_children()){
+				nextLayer.emplace(node);
+			}
+		}
+		while(nextLayer.size() > 0){
+			for(uint32_t iNode = 0; iNode < nextLayer.size(); iNode++){
+				thisLayerResults.emplace_back(nextLayer[iNode].activation()->evaluate(x[iInp]));
+				for(Node<T>* node : inputs->at(iInp).get_children()){
+					nextLayer.emplace(node);
+				}
+			}
+		}
+	}
+
+};
+
+template<typename T>
+class GraphComposer {
+	std::unordered_set<Node<T>*>* allNodes;
+public:
+	GraphComposer(){
+		allNodes = new std::unordered_set<Node<T>*>();
+	}
+
+	Node<T>* add_node(DifferentiableFunction<T>* f){
+		assert(f);
+		auto insertion = allNodes->emplace(f);
+		return &insertion->first;
+	}
+	Edge<T>* add_edge(Node<T>* from, Node<T>* to, DifferentiableFunction<T>* view){
+		assert(from);
+		assert(to);
+		assert(view);
+		assert(allNodes->find(*from) != allNodes->end());
+		assert(allNodes->find(*to) != allNodes->end());
+		from->add_child(to, view);
+		to->add_parent(from, view);
+	}
+
+	CompositeFunction<T> done(){
+		FunctionGraph<T> fg = FunctionGraph<T>(allNodes);
+		delete allNodes;
+		allNodes = nullptr;
+		return fg;
+	}
+};
 
 template<typename T>
 class SimpleFunctionOptimizer{
@@ -79,6 +127,17 @@ public:
 	GradientDescentOptimizer(DifferentiableFunction<T>* f){
 		this->f = f;
 		learning_rate = 0.001;
+
+		std::vector<double> *params = f->get_parameters();
+
+		GraphComposer<T> gc;
+		Node<T>* function = gc.add_node(f);
+		Node<T>* output = gc.add_node(new Linear<double>());
+		gc.add_edge(function, output, new Linear<double>());
+
+
+
+
 	}
 
 	void set_learning_rate(T learning_rate){

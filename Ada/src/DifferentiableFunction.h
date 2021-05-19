@@ -30,3 +30,12 @@ public:
 	virtual T const derivative(const T x) = 0;
 	virtual T const derivative(const T x, T* p) = 0;
 };
+
+template<typename T>
+class DifferentiableVectorFunction : virtual public ParametrizedFunction<T>{
+public:
+	virtual std::vector<T> const evaluate(const std::vector<T> x) = 0;
+	virtual std::vector<T> const jacobianColumn(const std::vector<T> x, T* p) = 0;
+	virtual T const jacobianRowWithManyP(const std::vector<T> x, T* p) = 0;
+	virtual std::vector<T> const jacobianWithManyP(const std::vector<T> x, T* p) = 0;
+};

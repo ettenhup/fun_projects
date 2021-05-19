@@ -29,6 +29,7 @@ class Node{
 	std::vector<Edge<T> > parents;
 	std::vector<Edge<T> > children;
 	DifferentiableFunction<T>* activation;
+	DifferentiableFunction<T>* activation;
 	Node(){};
 public:
 	Node(DifferentiableFunction<T>* f){
@@ -58,7 +59,7 @@ public:
 		}
 	}
 
-	DifferentiableFunction<T> * get_activation(){
+	T get_activity(){
 		return activation;
 	}
 
